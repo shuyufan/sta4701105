@@ -7,7 +7,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r setup}
+```{r setup pakcage}
 ##rm(list=ls())
 set.seed(10302020)
 library(mgcv)
@@ -89,13 +89,41 @@ summary(lmm)
 
 ```
 
-## Non-parametric
+## Non-parametric Repeated Measures ANOVA
 
 ```{r additional_packages}
 library(tidyverse)
 library(ggpubr)
 library(rstatix)
 ```
+
+```{r filter for nonpara}
+x_post1 <- x %>%
+  filter(time %in% c("baseline","post1"), lesional == "lesional", paired.pulse == "single")
+x_post1$amplitude <- scale(x_post1$amplitude)
+x_post1 <- x_post1[complete.cases(x_post1), ]
+x_post1$time <- factor(x_post1$time, levels=c("baseline","post1"))
+#check if the data set is complete
+#table(x_post1$time,x_post1$montage,x_post1$subjectID)
+```
+
+```{r run anova}
+res.aov <- aov(amplitude ~ time*montage + Error(subjectID), data = x_post1)
+get_anova_table(res.aov)
+# comparisons for montage variable
+x_post1 %>%
+  pairwise_t_test(
+    amplitude ~ montage, paired = TRUE, 
+    p.adjust.method = "bonferroni"
+    )
+# comparisons for time variable
+x_post1 %>%
+  pairwise_t_test(
+    amplitude ~ time, paired = TRUE, 
+    p.adjust.method = "bonferroni"
+    )
+```
+In the pairwise test, montage is shown to be significant.
 
 ### Check Assumptions
 #### Outliers
@@ -119,11 +147,6 @@ According to the Shapiro-Wilk’s test, since the observed p-values for all cate
 ggqqplot(x, "pct.change", facet.by = "time")
 ```
 According to the QQ-plot, in all categories in `time`, the larger points deviate significantly from the reference line. Thus, we conclude that the normality assumption is violated.
-
-```{r }
-aov <- anova_test(data = x, dv = pct.change, wid = subjectID, within = time)
-get_anova_table(aov)
-```
 
 
 ```{r rv-anova}
