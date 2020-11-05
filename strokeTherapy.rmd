@@ -12,6 +12,12 @@ knitr::opts_chunk$set(echo = TRUE)
 set.seed(10302020)
 library(mgcv)
 library(lme4)
+library(effects)
+library(sjPlot)
+library(glmmTMB)
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
 ```
 
 ```{r amplitude_data, echo=FALSE}
@@ -72,6 +78,7 @@ hist(x$amplitude,nclass=50)
 summary(x$pct.change)
 hist(x$pct.change,nclass=50)
 ```
+
 ```{r}
 table(x$replicate,useNA="always")
 table(x$time,useNA="always")
@@ -81,24 +88,28 @@ table(x$lesional,useNA="always")
 table(x$subjectID,useNA="always")
 ```
 
+```{r normalize amplitude data}
+x$amplitude <- scale(x$amplitude)
+```
+
 ## Linear Mixed Models
 ```{r lmm}
-x$amplitude <- scale(x$amplitude)
 #mV = BLmV + Time*Montage + (Time|SubjectID)
 lmm <- lmer(amplitude ~ BLmeanAmp + time*montage + (time|subjectID), data=x)
 summary(lmm)
-
 ```
 
 ### Check LMM Assumptions
 
+```{r check plot}
+#Try with model_plot (argument for type can be varied)
+plot_model(lmm, type='diag')
+```
+
+From the plots above, all assumptions are satisfied except the fact that residuals are showing a slight downward trend as fitted values increase. We are looking forward to addressing it in the in-class discussion soon.
+
 ## Non-parametric Repeated Measures ANOVA
 
-```{r additional_packages}
-library(tidyverse)
-library(ggpubr)
-library(rstatix)
-```
 
 ```{r filter for nonpara}
 x_post1 <- x %>%
