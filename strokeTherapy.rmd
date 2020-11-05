@@ -83,11 +83,14 @@ table(x$subjectID,useNA="always")
 
 ## Linear Mixed Models
 ```{r lmm}
+x$amplitude <- scale(x$amplitude)
 #mV = BLmV + Time*Montage + (Time|SubjectID)
 lmm <- lmer(amplitude ~ BLmeanAmp + time*montage + (time|subjectID), data=x)
 summary(lmm)
 
 ```
+
+### Check LMM Assumptions
 
 ## Non-parametric Repeated Measures ANOVA
 
@@ -100,7 +103,6 @@ library(rstatix)
 ```{r filter for nonpara}
 x_post1 <- x %>%
   filter(time %in% c("baseline","post1"), lesional == "lesional", paired.pulse == "single")
-x_post1$amplitude <- scale(x_post1$amplitude)
 x_post1 <- x_post1[complete.cases(x_post1), ]
 x_post1$time <- factor(x_post1$time, levels=c("baseline","post1"))
 #check if the data set is complete
@@ -108,24 +110,25 @@ x_post1$time <- factor(x_post1$time, levels=c("baseline","post1"))
 ```
 
 ```{r run anova}
-res.aov <- aov(amplitude ~ time*montage + Error(subjectID), data = x_post1)
+res.aov <- aov(pct.change ~ time*montage + Error(subjectID), data = x_post1)
 get_anova_table(res.aov)
 # comparisons for montage variable
 x_post1 %>%
   pairwise_t_test(
-    amplitude ~ montage, paired = TRUE, 
+    pct.change ~ montage, paired = TRUE, 
     p.adjust.method = "bonferroni"
     )
 # comparisons for time variable
 x_post1 %>%
   pairwise_t_test(
-    amplitude ~ time, paired = TRUE, 
+    pct.change ~ time, paired = TRUE, 
     p.adjust.method = "bonferroni"
     )
 ```
-In the pairwise test, montage is shown to be significant.
+In the pairwise test, both `montage` and `time` are shown to be significant.
 
-### Check Assumptions
+### Check Repeated Measures ANOVA Assumptions
+
 #### Outliers
 ```{r outliers}
 x %>%
@@ -149,9 +152,4 @@ ggqqplot(x, "pct.change", facet.by = "time")
 According to the QQ-plot, in all categories in `time`, the larger points deviate significantly from the reference line. Thus, we conclude that the normality assumption is violated.
 
 
-```{r rv-anova}
-# PerCh = 1 + Montage + (1|SubjectID)
-friedman.test(pct.change ~ 1 + montage + 1 | subjectID, data = x)
-
-```
 
