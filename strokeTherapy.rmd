@@ -1,6 +1,11 @@
 ---
-title: "strokeTherapy"
-output: html_document
+title: "Stroke Therapy"
+author: "Lynn Fan, Alice Jiang, Yunyao Zhu"
+date: "11/05/2020"
+output:
+  pdf_document:
+    latex_engine: xelatex
+geometry: margin=0.6in
 ---
 
 ```{r setup, include=FALSE}
@@ -51,9 +56,6 @@ x$lesional<-factor(x$lesional,levels=c(1:2), labels=c("lesional","nonlesional"))
 x$subjectID<-factor(x$subjectID)
 head(x)
 ```
-```{r}
-x
-```
 
 
 ```{r add_baseline_means}
@@ -94,10 +96,12 @@ x$amplitude <- scale(x$amplitude)
 
 ## Linear Mixed Models
 ```{r lmm}
+library(lmerTest)
 #mV = BLmV + Time*Montage + (Time|SubjectID)
 lmm <- lmer(amplitude ~ BLmeanAmp + time*montage + (time|subjectID), data=x)
 summary(lmm)
 ```
+Based on the p-values, baseline mV and montage are shown to be significant. Some interactions between levels of time and montage are also significant, but none of the main effects of time is significant.
 
 ### Check LMM Assumptions
 
