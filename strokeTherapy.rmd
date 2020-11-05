@@ -1,0 +1,134 @@
+---
+title: "strokeTherapy"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup}
+##rm(list=ls())
+set.seed(10302020)
+library(mgcv)
+library(lme4)
+```
+
+```{r amplitude_data, echo=FALSE}
+x<-read.table("mV.txt",header=TRUE,
+              sep="\t",na.strings=c("",".","NA","N/A","NaN"),
+              strip.white=TRUE,as.is=TRUE)
+dim(x)
+head(x)
+```
+
+```{r percent_change, echo=FALSE}
+x2<-read.table("pctChange.txt",header=TRUE,
+               sep="\t",na.strings=c("",".","NA","N/A","NaN"),
+               strip.white=TRUE,as.is=TRUE)
+dim(x2)
+head(x2)
+```
+
+```{r check_data_size}
+table(unlist(x[,-1]==x2[,-1]))
+```
+```{r combine_data}
+x$pct.change<-x2$pct.change
+rm(x2)
+x$condBySubject<-paste0(x$subject,x$montage,x$paired.pulse,x$lesional)
+x$replicate<-factor(x$replicate)
+x$time<-factor(x$time,levels=c(1:5), labels=c("baseline","post1","post2","post3","post4"))
+x$montage<-factor(x$montage,levels=c(1:3), labels=c("anodal","bihemi","cathodal"))
+x$paired.pulse<-factor(x$paired.pulse,levels=c(1,2,3), labels=c("single","inhibitory","excitory"))
+x$lesional<-factor(x$lesional,levels=c(1:2), labels=c("lesional","nonlesional"))
+x$subjectID<-factor(x$subjectID)
+head(x)
+```
+```{r}
+x
+```
+
+
+```{r add_baseline_means}
+bl<-x[x$time=="baseline",]
+## baseline mean amplitude by condtion:
+bl.means<-tapply(bl$amplitude,bl$condBySubject,mean)
+summary(bl.means)
+length(bl.means)
+length(unique(bl$condBySubject))
+x<-merge(x,bl.means,by.x="condBySubject",by.y=0,all.x=TRUE)
+colnames(x)[colnames(x)=="y"]<-"BLmeanAmp"
+head(x)
+```
+
+
+```{r eda_amplitude}
+summary(x$amplitude)
+hist(x$amplitude,nclass=50)
+```
+
+```{r eda_pctchange}
+summary(x$pct.change)
+hist(x$pct.change,nclass=50)
+```
+```{r}
+table(x$replicate,useNA="always")
+table(x$time,useNA="always")
+table(x$montage,useNA="always")
+table(x$paired.pulse,useNA="always")
+table(x$lesional,useNA="always")
+table(x$subjectID,useNA="always")
+```
+
+## Linear Mixed Models
+```{r lmm}
+#mV = BLmV + Time*Montage + (Time|SubjectID)
+lmm <- lmer(amplitude ~ BLmeanAmp + time*montage + (time|subjectID), data=x)
+summary(lmm)
+
+```
+
+## Non-parametric
+
+```{r additional_packages}
+library(tidyverse)
+library(ggpubr)
+library(rstatix)
+```
+
+### Check Assumptions
+#### Outliers
+```{r outliers}
+x %>%
+  group_by(time) %>%
+  identify_outliers(pct.change)
+```
+There are quite a few extreme outliers in `pct.change` (e.g. a percent change of 617.4672). Thus, the assumption that there were no extreme outliers is violated.
+
+#### Normality
+```{r normality}
+x %>%
+  group_by(time) %>%
+  shapiro_test(pct.change)
+```
+
+According to the Shapiro-Wilk’s test, since the observed p-values for all categories in `time` are less than 0.05, we reject the null hypothesis that the data are normally distributed.
+
+```{r normality-qqplot}
+ggqqplot(x, "pct.change", facet.by = "time")
+```
+According to the QQ-plot, in all categories in `time`, the larger points deviate significantly from the reference line. Thus, we conclude that the normality assumption is violated.
+
+```{r }
+aov <- anova_test(data = x, dv = pct.change, wid = subjectID, within = time)
+get_anova_table(aov)
+```
+
+
+```{r rv-anova}
+# PerCh = 1 + Montage + (1|SubjectID)
+friedman.test(pct.change ~ 1 + montage + 1 | subjectID, data = x)
+
+```
+
